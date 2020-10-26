@@ -1,1 +1,1 @@
-python complime.py --help
+python lua_macro.py --help
