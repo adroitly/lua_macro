@@ -85,25 +85,30 @@ def replace_temp_lines(lines, tags):
     targetLines = []
     state = 0
     hasTag = False
+    isTagStart = False
     for line in tempLines:
         if START_IF in line or ELSE_IF in line:
             if state == 1:
                 targetLines.append(TAG_END + "\n")
+                isTagStart = False
             targetLines.append(line)
             if not line_isin_tags(line, tags):
                 targetLines.append(TAG_START + "\n")
+                isTagStart = True
                 state = 1
             else:
                 hasTag = True
                 state = 0
         elif ELSE in line:
-            if state == 1:
+            if isTagStart :
                 targetLines.append(TAG_END + "\n")
+                isTagStart = False
             targetLines.append(line)
             if hasTag:
                 targetLines.append(TAG_START + "\n")
+                isTagStart = True
         elif END_IF in line:
-            if hasTag:
+            if isTagStart:
                 targetLines.append(TAG_END + "\n")
             targetLines.append(line)
         else:
