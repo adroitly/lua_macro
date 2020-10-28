@@ -1,6 +1,8 @@
 # coding:utf-8
 import sys
 import os
+import time
+import re
 
 START_IF = "--#if"
 ELSE_IF = "--#elseif"
@@ -120,12 +122,13 @@ def replace_temp_lines(lines, tags):
 def replace_file(filePath, tags):
     if not os.path.isfile(filePath):
         return
-    log("replaceing ", filePath, " ----")
+    log("replaceing ", filePath)
     lines = []
     tempLines = []
     tag = 0
     with open(filePath, "r") as file:
         allLines = file.readlines()
+        # 可以使用pattern = re.compile(ur'^' + START_IF + '[\d\D]*?' + END_IF)
         for line in allLines:
             if tag == 0:
                 if line.lstrip().startswith(START_IF):
@@ -149,12 +152,23 @@ def replace_file(filePath, tags):
         file.write(writeStr)
 
 def replace_dir_files(path, tags):
+    fileCount = 0
+    maxTime = 0
+    maxFile = ""
     for root, dirs, files in os.walk(path):
         for file in files:
             if not file.endswith(FILE_NAME):
                 continue
             fullPath = os.path.join(root, file)
+            fileCount += 1
+            t = time.time()
             replace_file(fullPath, tags)
+            t = time.time() - t
+            if t > maxTime:
+                maxTime = t
+                maxFile = fullPath
+    log("max time use", str(maxTime) + "s", "file =", maxFile)
+    log("replace count ", fileCount)
 
 def read_cmds():
     cmds = {}
@@ -197,9 +211,7 @@ if __name__ == '__main__':
 
     log("is remove", REMOVE_TEXT)
     log("start replace ", path)
-
-    if os.path.isfile(path):
-        replace_file(path, tags)
-    else:
-        replace_dir_files(path, tags)
+    t = time.time()
+    replace_dir_files(path, tags)
+    log("use time", str(time.time() - t) + "s")
     log("replace end----")
