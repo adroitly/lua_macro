@@ -10,7 +10,6 @@ ELSE = "--#else"
 END_IF = "--#endif"
 TAG_START = "--[[ AUTO_COMPLIME_START --"
 TAG_END = "-- AUTO_COMPLIME_END ]] --"
-FILE_NAME = ".lua"
 REMOVE_TEXT = False
 
 helpStr = """
@@ -21,6 +20,8 @@ cmds =
     --path=path
     --tags="tag1|tag2"
     --remove=false/true
+    --exclude="path|path"
+    --endswith=".lua|.py"
     --help show detail
 """
 
@@ -121,11 +122,12 @@ def replace_temp_lines(lines, tags):
 
 def replace_file(filePath, tags):
     if not os.path.isfile(filePath):
-        return
-    log("replaceing ", filePath)
+        return False
+    # log("replaceing ", filePath)
     lines = []
     tempLines = []
     tag = 0
+    hasReplace = False
     with open(filePath, "r") as file:
         allLines = file.readlines()
         # 可以使用pattern = re.compile(ur'^' + START_IF + '[\d\D]*?' + END_IF)
@@ -140,6 +142,9 @@ def replace_file(filePath, tags):
             elif tag == 1:
                 tempLines.append(line)
                 if line.lstrip().startswith(END_IF):
+                    if (not hasReplace):
+                        log("replaceing ", filePath)
+                    hasReplace = True
                     tempLines = replace_temp_lines(tempLines, tags)
                     for line in tempLines:
                         lines.append(line)
@@ -150,20 +155,43 @@ def replace_file(filePath, tags):
         writeStr += line
     with open(filePath, "w") as file:
         file.write(writeStr)
+    return hasReplace
 
-def replace_dir_files(path, tags):
+def file_endswith(file, endswith):
+    if len(endswith) == 0:
+        return True
+    for data in endswith:
+        if file.endswith(data):
+            return True
+    return False
+
+def file_exclude(file, exclude):
+    if len(exclude) == 0:
+        return False
+    file = file.replace("\\", "/").replace("//", "/")
+    for data in exclude:
+        if file.startswith(data) or data in file:
+            return True
+    return False
+
+def file_is_include(file, endswith, exclude):
+    return not file_exclude(file, exclude) and file_endswith(file, endswith)
+
+def replace_dir_files(path, tags, endswith, exclude):
     fileCount = 0
     maxTime = 0
     maxFile = ""
     for root, dirs, files in os.walk(path):
         for file in files:
-            if not file.endswith(FILE_NAME):
-                continue
             fullPath = os.path.join(root, file)
+            if not file_is_include(fullPath, endswith, exclude):
+                continue
             fileCount += 1
             t = time.time()
-            replace_file(fullPath, tags)
-            t = time.time() - t
+            if replace_file(fullPath, tags):
+                t = time.time() - t
+            else:
+                t = 0
             if t > maxTime:
                 maxTime = t
                 maxFile = fullPath
@@ -190,6 +218,9 @@ def read_cmds():
 
 if __name__ == '__main__':
     cmds = read_cmds()
+    log("cmds == ", cmds)
+    endswith = []
+    exclude = []
     if cmds.has_key("help"):
         log(helpStr)
         exit(0)
@@ -199,6 +230,13 @@ if __name__ == '__main__':
     if not cmds.has_key("tags"):
         log("please use --tags = \"tag1|tag2|tag3\"")
         exit(0)
+    if cmds.has_key("endswith"):
+        endswith = cmds["endswith"].split("|")
+    if cmds.has_key("exclude"):
+        exclude = cmds["exclude"].replace("\\", "/").replace("//", "/").split("|")
+
+    log("endswith", endswith)
+    log("exclude", exclude)
 
     path = cmds["path"]
     tagsStr = cmds["tags"]
@@ -212,6 +250,6 @@ if __name__ == '__main__':
     log("is remove", REMOVE_TEXT)
     log("start replace ", path)
     t = time.time()
-    replace_dir_files(path, tags)
+    replace_dir_files(path, tags, endswith, exclude)
     log("use time", str(time.time() - t) + "s")
     log("replace end----")
